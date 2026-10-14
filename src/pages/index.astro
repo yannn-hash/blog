@@ -1,0 +1,18 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PostList from '../components/PostList.astro';
+import { getPublicPosts } from '../lib/posts';
+const posts = await getPublicPosts();
+---
+<BaseLayout>
+  <section class="hero">
+    <p class="eyebrow"><span class="accent-dot" aria-hidden="true"></span> Blog pribadi / Riskiyanto</p>
+    <h1>Ruang kecil untuk<br />ide yang tumbuh<span class="accent">.</span></h1>
+    <div class="hero-bottom"><p>Menulis untuk memahami. Menyimpan hal-hal yang dipelajari, satu catatan pada satu waktu.</p><a class="text-link" href="/tentang/">Kenali blog ini <span aria-hidden="true">↗</span></a></div>
+  </section>
+  <section aria-labelledby="tulisan-terbaru">
+    <div class="section-heading"><h2 id="tulisan-terbaru">Tulisan terbaru</h2><a href="/blog/">Semua tulisan <span aria-hidden="true">→</span></a></div>
+    <PostList posts={posts.slice(0, 3)} />
+    {posts.length === 0 && <p>Belum ada tulisan yang diterbitkan. Kembali lagi nanti.</p>}
+  </section>
+</BaseLayout>

@@ -1,0 +1,19 @@
+---
+import { formatDate, postUrl, tagUrl, type Post } from '../lib/posts';
+interface Props { posts: Post[]; }
+const { posts } = Astro.props;
+---
+<ul class="post-list">
+  {posts.map((post, index) => (
+    <li class="post-row">
+      <div class="post-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</div>
+      <article>
+        <div class="post-meta"><time datetime={post.data.pubDate.toISOString()}>{formatDate(post.data.pubDate)}</time>{post.data.example && <span>Artikel contoh</span>}</div>
+        <h2><a href={postUrl(post)}>{post.data.title}</a></h2>
+        <p>{post.data.description}</p>
+        {post.data.tags.length > 0 && <ul class="tags" aria-label="Topik artikel">{post.data.tags.map((tag) => <li><a href={tagUrl(tag)}>{tag.replaceAll('-', ' ')}</a></li>)}</ul>}
+      </article>
+      <a class="read-link" href={postUrl(post)} aria-label={`Baca ${post.data.title}`}><span aria-hidden="true">↗</span></a>
+    </li>
+  ))}
+</ul>

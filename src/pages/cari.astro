@@ -1,0 +1,50 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getPublicPosts, postUrl, formatDate } from '../lib/posts';
+const posts = await getPublicPosts();
+---
+<BaseLayout title="Cari tulisan" description="Cari judul, deskripsi, atau topik dalam tulisan Riskiyanto.">
+  <header class="page-heading"><p class="eyebrow">Temukan catatan</p><h1>Apa yang ingin dibaca<span class="accent">?</span></h1></header>
+  <form id="search-form" role="search" class="search-form" hidden>
+    <label for="query">Cari judul, deskripsi, atau topik</label>
+    <div class="search-controls"><input id="query" name="q" type="search" placeholder="Misalnya: astro" aria-describedby="result-count" autocomplete="off" /><button type="submit">Cari</button></div>
+  </form>
+  <noscript><p class="example-note">Pencarian interaktif memerlukan JavaScript. Semua tulisan tersedia di bawah; gunakan fitur cari di halaman pada browser atau <a href="/tag/">jelajahi topik</a>.</p></noscript>
+  <p id="result-count" role="status" aria-live="polite" aria-atomic="true">{posts.length} tulisan tersedia.</p>
+  <ul id="search-results" class="search-results">
+    {posts.map((post) => <li data-search-post data-title={post.data.title} data-description={post.data.description} data-tags={JSON.stringify(post.data.tags)}><time datetime={post.data.pubDate.toISOString()}>{formatDate(post.data.pubDate)}</time><h2><a href={postUrl(post)}>{post.data.title}</a></h2><p>{post.data.description}</p>{post.data.example && <span class="small-note">Artikel contoh</span>}</li>)}
+  </ul>
+  <p id="no-results" hidden>Tidak ada tulisan yang cocok. Coba kata lain atau <a href="/blog/">lihat semua tulisan</a>.</p>
+</BaseLayout>
+<script>
+  import { matchesSearch } from '../lib/search';
+  const form = document.querySelector<HTMLFormElement>('#search-form');
+  const input = document.querySelector<HTMLInputElement>('#query');
+  const status = document.querySelector<HTMLElement>('#result-count');
+  const empty = document.querySelector<HTMLElement>('#no-results');
+  const rows = [...document.querySelectorAll<HTMLElement>('[data-search-post]')];
+  if (form && input && status && empty) {
+    form.hidden = false;
+    const update = () => {
+      let count = 0;
+      for (const row of rows) {
+        const match = matchesSearch({ title: row.dataset.title ?? '', description: row.dataset.description ?? '', tags: JSON.parse(row.dataset.tags ?? '[]') }, input.value);
+        row.hidden = !match;
+        if (match) count++;
+      }
+      status.textContent = `${count} tulisan ${input.value.trim() ? 'ditemukan' : 'tersedia'}.`;
+      empty.hidden = count > 0;
+    };
+    input.value = new URLSearchParams(location.search).get('q') ?? '';
+    input.addEventListener('input', update);
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const url = new URL(location.href);
+      if (input.value.trim()) url.searchParams.set('q', input.value.trim());
+      else url.searchParams.delete('q');
+      history.replaceState(null, '', url);
+      update();
+    });
+    update();
+  }
+</script>

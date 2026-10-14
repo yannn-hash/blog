@@ -1,0 +1,16 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostList from '../../components/PostList.astro';
+import { getPublicPosts, collectTags, type Post } from '../../lib/posts';
+export async function getStaticPaths() {
+  const posts = await getPublicPosts();
+  return collectTags(posts).map(([tag]) => ({ params: { tag }, props: { tag, posts: posts.filter((post) => post.data.tags.includes(tag)) } }));
+}
+interface Props { tag: string; posts: Post[]; }
+const { tag, posts } = Astro.props;
+const label = tag.replaceAll('-', ' ');
+---
+<BaseLayout title={`Topik: ${label}`} description={`Tulisan Riskiyanto tentang ${label}.`}>
+  <header class="page-heading"><a class="back-link" href="/tag/">← Semua topik</a><p class="eyebrow">Topik / {posts.length} tulisan</p><h1>{label}<span class="accent">.</span></h1></header>
+  <PostList posts={posts} />
+</BaseLayout>

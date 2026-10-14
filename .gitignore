@@ -1,0 +1,25 @@
+# Dependensi dan hasil build
+node_modules/
+dist/
+.astro/
+.wrangler/
+
+# Variabel lokal dan rahasia
+.env
+.env.*
+!.env.example
+
+# Cache dan log
+*.log
+.DS_Store
+Thumbs.db
+.uv-cache*/
+__pycache__/
+*.py[cod]
+
+# Snapshot BMad yang dihasilkan otomatis
+_bmad/render/
+
+# Rencana lokal (nama file saat ini dan versi huruf kecil)
+RENCANA-BLOG.md
+rencana-blog.md

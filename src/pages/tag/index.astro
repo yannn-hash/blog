@@ -1,0 +1,10 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getPublicPosts, collectTags, tagUrl } from '../../lib/posts';
+const tags = collectTags(await getPublicPosts());
+---
+<BaseLayout title="Topik" description="Jelajahi tulisan Riskiyanto berdasarkan topik.">
+  <header class="page-heading"><p class="eyebrow">Jelajahi</p><h1>Ikuti rasa ingin tahu<span class="accent">.</span></h1><p>Pilih satu topik, temukan catatan yang berkaitan.</p></header>
+  <ul class="topic-list">{tags.map(([tag, count]) => <li><a href={tagUrl(tag)}><span>{tag.replaceAll('-', ' ')}</span><span class="topic-count">{count} tulisan <span aria-hidden="true">↗</span></span></a></li>)}</ul>
+  {tags.length === 0 && <p>Belum ada topik dari tulisan yang diterbitkan.</p>}
+</BaseLayout>

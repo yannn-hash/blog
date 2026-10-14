@@ -1,0 +1,11 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostList from '../../components/PostList.astro';
+import { getPublicPosts } from '../../lib/posts';
+const posts = await getPublicPosts();
+---
+<BaseLayout title="Semua tulisan" description="Arsip tulisan di blog pribadi Riskiyanto.">
+  <header class="page-heading"><p class="eyebrow">Arsip / {posts.length} tulisan</p><h1>Semua tulisan<span class="accent">.</span></h1><p>Catatan yang sudah menemukan tempatnya.</p></header>
+  <PostList posts={posts} />
+  {posts.length === 0 && <p>Belum ada tulisan yang diterbitkan.</p>}
+</BaseLayout>
