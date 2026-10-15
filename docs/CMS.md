@@ -2,7 +2,7 @@
 
 Editor Decap CMS 3.17.1 tersedia di **/admin/**. Artikel tetap Markdown di `src/content/blog`; tidak ada database, SSR, atau editorial workflow. Produksi memakai repositori **yannn-hash/blog**, branch **main**, dan hanya akun GitHub **yannn-hash** dengan izin push yang diterima broker login.
 
-Implementasi sudah dapat diuji lokal. **Login GitHub produksi belum diverifikasi dengan OAuth App nyata; browser QA belum dilakukan karena browser tidak tersedia di lingkungan pengerjaan.** Jangan menganggap pemasangan kode sebagai bukti login produksi sudah aktif.
+Implementasi diuji dengan proxy lokal dan browser memakai respons backend simulasi. **Login GitHub, penghapusan produksi, dan Deploy Cloudflare nyata belum diverifikasi.** Pemasangan kode tidak mengaktifkan pengaturan Cloudflare atau membuktikan login produksi sudah aktif.
 
 ## Coba lokal dengan dua terminal
 
@@ -39,6 +39,12 @@ Hentikan `cms:local` sebelum menjalankan `npm.cmd test`. Pengujian memakai port 
 5. Untuk menerbitkan, matikan draf dan pilih hari ini atau sebelumnya. Tanggal disimpan sebagai string YAML bertanda kutip; boolean tetap boolean. Artikel masa depan dan draf disembunyikan di beranda, arsip, detail, topik, pencarian, RSS, dan sitemap.
 
 Penerbitan mengikuti pukul 00.00 **Asia/Jakarta**. Situs statis hanya berubah setelah build/deployment baru. Artikel terjadwal tidak otomatis muncul saat jam berganti.
+
+## Menghapus artikel
+
+Tombol **Hapus** ada di samping setiap artikel pada daftar, grid, dan hasil pencarian. Dialog menampilkan judul serta path file; dua artikel berjudul sama tetap dibedakan melalui path. Ketik judul persis, termasuk huruf besar dan tanda baca, lalu tekan **Hapus**. **Batal** atau Escape menutup dialog dan mengembalikan fokus. Permintaan yang sedang berjalan tidak dapat dikirim ulang.
+
+Di GitHub, editor membaca versi SHA saat dialog dibuka dan menghapus dengan SHA tersebut. Jika file berubah, hilang, atau koneksi gagal, daftar tetap ditampilkan bersama pesan dan tombol muat ulang. Setelah kesalahan jaringan, periksa hasil lewat muat ulang sebelum mencoba lagi. Di lokal, penghapusan memakai proxy loopback yang sama. Penghapusan tidak menghapus gambar/media. Setelah berhasil, koleksi dimuat ulang dan pemberitahuan menjelaskan bahwa penghapusan tersimpan tetapi situs publik menunggu deployment. Pemulihan file yang sudah dihapus dilakukan melalui riwayat Git atau cadangan lokal.
 
 ## Menyiapkan OAuth App (manual oleh pemilik)
 
@@ -79,9 +85,19 @@ Jika popup gagal, bagikan hanya kode `CMS_AUTH_...` yang tampil, bukan URL callb
 
 Kode diagnosis tetap statis: respons tidak menyertakan token, code/state/cookie, kredensial, pesan mentah GitHub atau detail exception. Pesan ini membantu menemukan penyebab; munculnya kode baru bukan bukti login sudah diperbaiki.
 
-## Build/deployment tetap manual
+## Simpan beberapa perubahan, lalu Deploy
 
-Di produksi, menyimpan dari CMS membuat commit di GitHub `main`. **Tidak ada deployment otomatis yang dikonfigurasi.** Tarik perubahan terlebih dahulu, lalu periksa dan deploy secara manual:
+Di produksi, **Simpan** membuat commit di GitHub `main`. Setelah pemilik memasang Workers Builds, watch paths, main Deploy Hook, serta runtime bindings sesuai [panduan Cloudflare](DEPLOY-CLOUDFLARE.md#6-deploy-berkelompok-dari-cms), commit yang hanya mengubah artikel (`src/content/blog/*`) atau media (`public/uploads/*`) menunggu tombol **Deploy**. Commit kode tetap otomatis membangun `main` dan dapat menyertakan seluruh perubahan konten yang sudah tersimpan. Pengaturan dashboard ini belum diubah oleh implementasi.
+
+Tombol **Deploy** muncul di dekat **Quick add** sesudah login; panel status berada di bawah header. Simpan semua edit terlebih dahulu. Deploy menggunakan seluruh commit terakhir di `main`, termasuk media; tombol ini tidak menyimpan editor yang masih terbuka. Draf dan artikel masa depan tetap tersembunyi. Mode lokal menampilkan keterangan dan menonaktifkan Deploy karena proxy hanya mengubah file komputer.
+
+Panel memeriksa build aktif sebelum mengizinkan permintaan. Selama antrean atau build berjalan, Deploy dinonaktifkan. Status diperiksa setiap lima detik dan dilanjutkan setelah halaman dimuat ulang pada tab yang sama. Status akhir membedakan berhasil, gagal, dibatalkan, dan dilewati. **Kesalahan pemantauan tidak berarti build gagal:** status terakhir dipertahankan dan **Periksa status** mencoba GET lagi. Tautan **Buka build di Cloudflare** membuka dashboard untuk pemeriksaan log dan deployment.
+
+Jika koneksi putus saat mengirim Deploy, hasil POST dapat belum diketahui meskipun Cloudflare sudah menerima permintaan. Editor menyimpan keadaan ini sebelum pengiriman dan **tidak otomatis mengulang POST**, termasuk setelah refresh. Gunakan **Periksa status** dan dashboard; setelah memastikan tidak ada build aktif dan hasil permintaan lama sudah jelas, pilih **Saya sudah memeriksa dashboard; izinkan Deploy baru**. Pemantauan tetap harus berhasil sebelum tombol aktif. Build lama yang sudah selesai tidak menghapus ketidakpastian permintaan baru.
+
+Ada kemungkinan commit masuk setelah pemeriksaan build atau deployment kode dimulai bersamaan dengan klik Deploy. Guard editor/Worker dan respons `already_exists` mengurangi duplikasi; ini bukan kunci transaksi lintas seluruh Cloudflare isolate atau sumber build. Periksa dashboard jika dua sumber pemicu berdekatan.
+
+Alur CLI tetap tersedia. Tarik perubahan terlebih dahulu, lalu periksa dan deploy saat siap:
 
 ```powershell
 git status
@@ -92,11 +108,11 @@ npm.cmd test
 npm.cmd run deploy
 ```
 
-Selesaikan perubahan lokal/konflik sebelum pull. `npm test` sudah membangun situs; `deploy` membangun lagi kemudian mengunggah Worker/aset ke akun Cloudflare aktif. Periksa akun/Worker sebelum menjalankannya. Pemasangan ini tidak menjalankan push, deploy, perubahan DNS, atau membuat OAuth App.
+Selesaikan perubahan lokal/konflik sebelum pull. `npm test` sudah membangun situs; `deploy` membangun lagi kemudian mengunggah Worker/aset ke akun Cloudflare aktif. Periksa akun/Worker sebelum menjalankannya. Pemasangan kode ini tidak menjalankan push, deploy, perubahan DNS, membuat OAuth App, atau mengubah watch paths.
 
 ## Verifikasi produksi setelah setup
 
-Setelah pemilik mengatur secrets dan deploy, buka `/admin/`, login sebagai yannn-hash, simpan satu draf, ubah judul/tanggal artikel yang sama, dan unggah gambar percobaan. Pastikan commit/path benar di GitHub, lalu tarik perubahan dan build/deploy manual. Uji draf tetap 404 dan artikel terbit muncul konsisten pada seluruh permukaan publik. Uji penolakan akun lain serta popup ditutup/izin ditolak. Browser harus mengizinkan popup untuk situs ini. Pengujian lokal dengan mock GitHub tidak menggantikan langkah ini.
+Setelah pemilik mengatur OAuth dan deploy prerequisites, buka `/admin/`, login sebagai yannn-hash, simpan satu draf, ubah judul/tanggal artikel yang sama, dan unggah gambar percobaan. Pastikan commit/path benar di GitHub dan perubahan konten tidak memicu build otomatis. Simpan beberapa perubahan, klik Deploy satu kali, ikuti antrean hingga berhasil, lalu periksa situs. Muat ulang selama build dan pastikan status berlanjut tanpa pemicu baru. Uji draf tetap 404 dan artikel terbit muncul konsisten pada seluruh permukaan publik. Uji penghapusan hanya pada artikel percobaan milik sendiri setelah memastikan cadangan: path yang benar hilang, gambar tetap ada, dan situs baru berubah sesudah deploy. Uji commit kode memicu build otomatis serta dapat membawa konten yang sebelumnya menunggu. Uji penolakan akun lain serta popup ditutup/izin ditolak. Browser harus mengizinkan popup untuk situs ini. Pengujian lokal dengan mock tidak menggantikan langkah produksi ini.
 
 ## Pindah ke smtmtc.com
 

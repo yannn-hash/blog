@@ -1,3 +1,5 @@
+import { handleDeploy } from './cms-deploy.mjs';
+
 const COOKIE = '__Host-smtmtc-cms';
 const TTL = 600;
 const encoder = new TextEncoder();
@@ -79,6 +81,7 @@ function success(token, origin) {
 export async function handleRequest(request, env, fetcher = fetch) {
   const url = new URL(request.url);
   if (!url.pathname.startsWith('/api/cms/')) return env.ASSETS.fetch(request);
+  if (['/api/cms/deploy', '/api/cms/deploy/status'].includes(url.pathname)) return handleDeploy(request, env, fetcher);
   const callback = url.pathname === '/api/cms/callback';
   if (!['/api/cms/auth', '/api/cms/callback'].includes(url.pathname)) return error(404);
   if (request.method !== 'GET') return error(405, callback);

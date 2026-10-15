@@ -1,5 +1,7 @@
 import { articleFormat, beforeSave } from './content.mjs';
 import { cmsConfig } from './config.mjs';
+import { initializeActions } from './ui.mjs';
+import './actions.css';
 
 const help = document.getElementById('cms-help');
 window.CMS_MANUAL_INIT = true;
@@ -12,6 +14,7 @@ script.onload = () => {
     cms.registerCustomFormat('smtmtc-markdown', 'md', articleFormat);
     cms.registerEventListener({ name: 'preSave', handler: beforeSave });
     cms.init({ config: cmsConfig(window.location.hostname) });
+    initializeActions(window);
     help.textContent = 'Editor sedang dimuat. Jika editor tidak muncul, muat ulang halaman atau periksa konsol browser.';
     setTimeout(() => { if (document.querySelector('#nc-root')?.childElementCount) help.hidden = true; }, 3000);
   } catch (error) {

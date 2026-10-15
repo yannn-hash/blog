@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { readFile, rm, access } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rm, access } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { articleFormat } from '../src/cms/content.mjs';
+import { contentActions } from '../src/cms/actions.mjs';
 
 const runtime = path.resolve('node_modules/node/bin', process.platform === 'win32' ? 'node.exe' : 'node');
 const endpoint = 'http://127.0.0.1:8081/api/v1';
@@ -30,6 +31,7 @@ test('real loopback proxy CRUD yields buildable CMS Markdown; draft/future/curre
   const prefix = `cms-test-${randomUUID().replaceAll('-', '')}`;
   const slugs = ['public', 'draft', 'future'].map((suffix) => `${prefix}-${suffix}`);
   const filenames = slugs.map((slug) => `src/content/blog/${slug}.md`);
+  const mediaFixture = `public/uploads/${prefix}.txt`;
   for (const filename of filenames) await assert.rejects(access(filename));
   const proxy = spawn(runtime, ['scripts/cms-local.mjs'], { env: { ...process.env, BIND_HOST: '0.0.0.0', ORIGIN: '*', MODE: 'git', GIT_REPO_DIRECTORY: 'does-not-exist' }, stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
@@ -37,7 +39,7 @@ test('real loopback proxy CRUD yields buildable CMS Markdown; draft/future/curre
   let touchedBuild = false;
   try {
     let ready = false;
-    for (let attempt = 0; attempt < 100; attempt++) {
+    for (let attempt = 0; attempt < 200; attempt++) {
       if (proxy.exitCode !== null) throw new Error(output);
       try {
         const result = await api('info');
@@ -81,12 +83,21 @@ test('real loopback proxy CRUD yields buildable CMS Markdown; draft/future/curre
     assert.match(admin, /<noscript>/);
     assert.match(admin, /cms-help/);
     assert.ok(!(await read('sitemap-0.xml')).includes('/admin/'));
-    for (const filename of filenames) assert.equal((await api('deleteFile', { branch: 'main', path: filename, options: { commitMessage: 'Hapus fixture' } })).response.status, 200);
+    const actions = contentActions({ user: { backend: 'local' }, hostname: 'localhost' });
+    await mkdir('public/uploads', { recursive: true });
+    await writeFile(mediaFixture, 'Fixture media harus tetap ada setelah artikel dihapus.');
+    for (const filename of filenames) {
+      const captured = await actions.load(filename);
+      assert.equal(captured.path, filename);
+      await actions.remove(captured);
+      await access(mediaFixture);
+    }
     for (const filename of filenames) await assert.rejects(access(filename));
   } finally {
     proxy.kill();
     await Promise.race([new Promise((resolve) => proxy.once('exit', resolve)), delay(3000)]);
     for (const filename of filenames) await rm(filename, { force: true });
+    await rm(mediaFixture, { force: true });
     if (touchedBuild) await build();
   }
 });
