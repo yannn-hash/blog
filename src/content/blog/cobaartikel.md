@@ -5,7 +5,7 @@ draft: false
 example: true
 filename: 'cobaartikel'
 title: 'coba coba'
-description: 'coba coba'
+description: 'coba cobassss'
 pubDate: '2026-10-15'
 ---
 # INI JUDUL
