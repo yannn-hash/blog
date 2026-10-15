@@ -46,7 +46,7 @@ Di akun GitHub yannn-hash, buka Settings → Developer settings → OAuth Apps �
 
 - Nama: misalnya `smtmtc CMS`.
 - Homepage URL: `https://smtmtc-blog.smtmtc.workers.dev`.
-- Authorization callback URL persis: **`https://smtmtc-blog.smtmtc.workers.dev/api/cms/callback`**.
+- Redirect URI (disebut Authorization callback URL pada beberapa panduan) persis: **`https://smtmtc-blog.smtmtc.workers.dev/api/cms/callback`**. Matikan **Allow wildcard matching**, lalu simpan dengan **Update application**.
 
 Ini adalah **OAuth App**, bukan GitHub App. Jangan menaruh client secret/token di browser, Git, frontmatter, atau chat. Broker meminta scope **public_repo**. Scope ini memberi akses tulis ke seluruh repositori publik yang dapat diakses akun, bukan hanya blog. Broker membatasi login menjadi yannn-hash dan memeriksa push pada `yannn-hash/blog`, tetapi token GitHub tetap mempunyai breadth scope tersebut. GitHub kadang mengembalikan parent scope `repo` jika otorisasi sebelumnya lebih luas; broker menerimanya sebagai superset. Cabut otorisasi aplikasi melalui pengaturan GitHub jika diperlukan.
 
@@ -60,9 +60,24 @@ node scripts/run.mjs wrangler secret put CMS_SESSION_SECRET
 
 Untuk secret sesi, buat nilai acak minimal 32 karakter melalui password manager atau generator lokal, lalu tempel hanya ke prompt secret. Jangan gunakan contoh placeholder. `CMS_ORIGIN` sudah dipin ke URL workers.dev pada `wrangler.jsonc`, dan harus sama dengan origin admin. Belum ada secrets yang disertakan proyek. Jika konfigurasi belum lengkap, endpoint login mengembalikan 503 dengan petunjuk.
 
+Secret harus menjadi binding runtime Worker `smtmtc-blog`, bukan variabel build. `wrangler secret list --name smtmtc-blog` menampilkan nama/jenis tanpa nilainya; pastikan ketiga nama di atas ada. Setiap `secret put` langsung membuat versi dan deployment konfigurasi baru, jadi tunggu berhasil sebelum lanjut.
+
 Untuk pengembangan Worker, `.env.example` hanya berisi placeholder: salin ke `.dev.vars`, isi secara lokal bila diperlukan, dan jangan commit. Semua varian `.dev.vars.*` diabaikan kecuali `.dev.vars.example`. Astro tidak membaca secret ini ke halaman admin. Secure cookie OAuth memerlukan origin HTTPS yang dikonfigurasi; login lokal sehari-hari memakai proxy filesystem dan tidak memerlukan secrets.
 
 Broker menggunakan state dan PKCE S256 serta cookie HMAC HttpOnly/Secure/SameSite=Lax berumur sepuluh menit. Callback memeriksa cookie/state, akun, scope, dan izin repo sebelum memberikan token lewat handshake popup dengan origin dan opener persis. Token tidak ditempatkan pada URL atau log aplikasi. Jika login gagal, tutup popup dan coba lagi dari `/admin/`; periksa konfigurasi OAuth App/secrets jika tetap gagal.
+
+Jika popup gagal, bagikan hanya kode `CMS_AUTH_...` yang tampil, bukan URL callback atau nilainya:
+
+- `CONFIG_MISSING`: periksa tiga secret runtime, panjang secret sesi minimal 32, dan origin HTTPS tanpa garis miring akhir.
+- `SESSION_COOKIE_MISSING`, `SESSION_INVALID`, `STATE_MISMATCH`, `CODE_INVALID`, `CODE_REJECTED`: tutup popup lama, mulai login baru dari `/admin/` dalam sepuluh menit, dan izinkan cookie situs. Jangan refresh atau memakai ulang URL callback; pergantian secret sesi membatalkan sesi lama.
+- `CREDENTIALS_INVALID`: masukkan ulang Client ID dan client secret dari OAuth App yang sama melalui prompt Wrangler.
+- `CALLBACK_MISMATCH`: cocokkan Redirect URI persis dengan alamat callback di atas.
+- `EMAIL_UNVERIFIED`: verifikasi email utama di GitHub, lalu mulai login baru.
+- `TOKEN_REQUEST`, `TOKEN_RESPONSE`: pertukaran token gagal, respons tidak valid, atau scope tidak cukup; mulai ulang login dan periksa pengaturan OAuth sebelum mengubah kredensial.
+- `ACCOUNT_CHECK`, `REPOSITORY_CHECK`: gunakan akun `yannn-hash` dan pastikan izin push pada `yannn-hash/blog`; tahap ini juga dapat gagal jika GitHub tidak dapat dihubungi.
+- `ORIGIN_MISMATCH`, `AUTH_START`, `POPUP_RESPONSE`, `REQUEST_REJECTED`: periksa origin admin dan laporkan kode tersebut untuk pemeriksaan lebih lanjut.
+
+Kode diagnosis tetap statis: respons tidak menyertakan token, code/state/cookie, kredensial, pesan mentah GitHub atau detail exception. Pesan ini membantu menemukan penyebab; munculnya kode baru bukan bukti login sudah diperbaiki.
 
 ## Build/deployment tetap manual
 

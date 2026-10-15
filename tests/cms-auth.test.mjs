@@ -22,7 +22,7 @@ function github(overrides = {}) {
   const calls = [];
   const fetcher = async (url, options) => {
     calls.push({ url, options });
-    assert.equal(options.redirect, 'error');
+    assert.equal(options.redirect, 'manual');
     assert.ok(options.signal instanceof AbortSignal);
     const step = url.endsWith('access_token') ? 'token' : url.endsWith('/user') ? 'user' : 'repo';
     const defaults = { token: { access_token: tokenValue, token_type: 'bearer', scope: 'public_repo' }, user: { login: 'yannn-hash' }, repo: { full_name: 'yannn-hash/blog', permissions: { push: true } } };
@@ -153,4 +153,33 @@ test('missing settings, wrong methods/provider/origin/site and unknown API remai
   assert.equal((await handleRequest(new Request(`${origin}/api/cms/auth`, { method: 'POST' }), env)).status, 405);
   assert.equal((await handleRequest(new Request(`${origin}/api/cms/missing`), env)).status, 404);
   assert.equal(await (await worker.fetch(new Request(`${origin}/blog/`), env)).text(), 'static');
+});
+
+test('callback diagnostic codes identify fixed failure stages without reflecting sensitive data', async () => {
+  const session = await start();
+  const payload = JSON.parse(Buffer.from(session.cookie.split('=')[1].split('.')[0], 'base64url'));
+  const checks = [
+    [new Request(`${origin}/api/cms/callback?code=test-code&state=${session.state}`), {}, 'SESSION_COOKIE_MISSING', 0],
+    [callback({ ...session, cookie: session.cookie + 'x' }), {}, 'SESSION_INVALID', 0],
+    [callback({ ...session, cookie: signedCookie({ ...payload, exp: Date.now() - 1 }) }), {}, 'SESSION_INVALID', 0],
+    [callback({ ...session, state: 'wrong' }), {}, 'STATE_MISMATCH', 0],
+    [new Request(`${origin}/api/cms/callback?state=${session.state}`, { headers: { Cookie: session.cookie } }), {}, 'CODE_INVALID', 0],
+    [callback(session, '&error=private-provider-message'), {}, 'PROVIDER_REJECTED', 0],
+    ...[['incorrect_client_credentials', 'CREDENTIALS_INVALID'], ['redirect_uri_mismatch', 'CALLBACK_MISMATCH'], ['bad_verification_code', 'CODE_REJECTED'], ['unverified_user_email', 'EMAIL_UNVERIFIED'], ['private-provider-message<script>', 'TOKEN_RESPONSE']].map(([error, expected]) => [callback(session), { token: { error, error_description: 'private-provider-message' } }, expected, 1]),
+    [callback(session), { token: new Response('{invalid-private-provider-message') }, 'TOKEN_REQUEST', 1],
+    [callback(session), { token: new Response('private-provider-message', { status: 403 }) }, 'TOKEN_REQUEST', 1],
+    [callback(session), { token: { access_token: tokenValue, token_type: 'bearer', scope: '' } }, 'TOKEN_RESPONSE', 1],
+    [callback(session), { user: { login: 'private-provider-message' } }, 'ACCOUNT_CHECK', 2],
+    [callback(session), { repo: { full_name: 'yannn-hash/blog', permissions: { push: false } } }, 'REPOSITORY_CHECK', 3],
+  ];
+  for (const [request, overrides, expected, count] of checks) {
+    const mock = github(overrides), response = await handleRequest(request, env, mock.fetcher);
+    assert.equal(response.status, 400);
+    assert.equal(mock.calls.length, count);
+    assert.match(response.headers.get('set-cookie'), /Max-Age=0/);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    const text = await response.text();
+    assert.ok(text.includes(`Kode diagnosis: CMS_AUTH_${expected}.`), expected);
+    for (const value of [tokenValue, 'private-provider-message', 'test-code', session.state, session.cookie, env.GITHUB_CLIENT_SECRET]) assert.ok(!text.includes(value), `${expected} must not reflect private values`);
+  }
 });

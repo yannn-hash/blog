@@ -40,13 +40,14 @@ function config(env) {
     return { origin, hostname: url.hostname, callback: `${origin}/api/cms/callback` };
   } catch { return null; }
 }
-function error(status, callback = false) {
-  return new Response(status === 503 ? 'CMS belum dikonfigurasi. Pemilik perlu mengatur GitHub OAuth App dan Worker secrets; baca docs/CMS.md.' : 'Autentikasi CMS gagal. Tutup jendela ini dan coba login kembali.', {
+function error(status, callback = false, reason = 'REQUEST_REJECTED') {
+  const message = status === 503 ? 'CMS belum dikonfigurasi. Pemilik perlu mengatur GitHub OAuth App dan Worker secrets; baca docs/CMS.md.' : 'Autentikasi CMS gagal. Tutup jendela ini dan coba login kembali.';
+  return new Response(`${message}\nKode diagnosis: CMS_AUTH_${reason}. Bagikan hanya kode ini saat meminta bantuan.`, {
     status, headers: { ...securityHeaders, 'Content-Type': 'text/plain; charset=utf-8', 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'", ...(callback ? { 'Set-Cookie': clearCookie } : {}) },
   });
 }
 async function githubJSON(fetcher, url, options = {}) {
-  const response = await fetcher(url, { ...options, redirect: 'error', signal: AbortSignal.timeout(5000) });
+  const response = await fetcher(url, { ...options, redirect: 'manual', signal: AbortSignal.timeout(5000) });
   if (!response.ok) throw new Error('upstream');
   const reader = response.body?.getReader();
   if (!reader) throw new Error('upstream');
@@ -82,8 +83,9 @@ export async function handleRequest(request, env, fetcher = fetch) {
   if (!['/api/cms/auth', '/api/cms/callback'].includes(url.pathname)) return error(404);
   if (request.method !== 'GET') return error(405, callback);
   const settings = config(env);
-  if (!settings) return error(503, callback);
-  if (url.origin !== settings.origin || (request.headers.has('Origin') && request.headers.get('Origin') !== settings.origin)) return error(403, callback);
+  if (!settings) return error(503, callback, 'CONFIG_MISSING');
+  if (url.origin !== settings.origin || (request.headers.has('Origin') && request.headers.get('Origin') !== settings.origin)) return error(403, callback, 'ORIGIN_MISMATCH');
+  let phase = callback ? 'SESSION_INVALID' : 'AUTH_START';
   try {
     if (!callback) {
       if (url.searchParams.get('provider') !== 'github' || url.searchParams.get('site_id') !== settings.hostname) return error(400);
@@ -94,21 +96,32 @@ export async function handleRequest(request, env, fetcher = fetch) {
       return new Response(null, { status: 302, headers: { ...securityHeaders, Location: authorize.href, 'Set-Cookie': `${COOKIE}=${cookie}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${TTL}` } });
     }
     const cookies = (request.headers.get('Cookie') ?? '').split(';').map((value) => value.trim()).filter((value) => value.startsWith(`${COOKIE}=`));
-    if (cookies.length !== 1 || url.searchParams.has('error') || (url.searchParams.has('provider') && url.searchParams.get('provider') !== 'github')) return error(400, true);
+    if (cookies.length !== 1) return error(400, true, 'SESSION_COOKIE_MISSING');
+    if (url.searchParams.has('error') || (url.searchParams.has('provider') && url.searchParams.get('provider') !== 'github')) return error(400, true, 'PROVIDER_REJECTED');
     const session = await unseal(cookies[0].slice(COOKIE.length + 1), env.CMS_SESSION_SECRET);
     const code = url.searchParams.get('code');
-    if (!Number.isFinite(session.exp) || session.exp < Date.now() || session.exp > Date.now() + TTL * 1000 || !/^[A-Za-z0-9_-]{43}$/.test(session.verifier) || !equalState(session.state, url.searchParams.get('state')) || !code || code.length > 512 || !/^[A-Za-z0-9_-]+$/.test(code)) return error(400, true);
+    if (!Number.isFinite(session.exp) || session.exp < Date.now() || session.exp > Date.now() + TTL * 1000 || !/^[A-Za-z0-9_-]{43}$/.test(session.verifier)) return error(400, true, 'SESSION_INVALID');
+    if (!equalState(session.state, url.searchParams.get('state'))) return error(400, true, 'STATE_MISMATCH');
+    if (!code || code.length > 512 || !/^[A-Za-z0-9_-]+$/.test(code)) return error(400, true, 'CODE_INVALID');
+    phase = 'TOKEN_REQUEST';
     const token = await githubJSON(fetcher, 'https://github.com/login/oauth/access_token', {
       method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ client_id: env.GITHUB_CLIENT_ID, client_secret: env.GITHUB_CLIENT_SECRET, code, redirect_uri: settings.callback, code_verifier: session.verifier }),
     });
-    if (token.error || typeof token.access_token !== 'string' || !/^[A-Za-z0-9_]{1,512}$/.test(token.access_token) || typeof token.token_type !== 'string' || token.token_type.toLowerCase() !== 'bearer' || typeof token.scope !== 'string' || !token.scope.split(/[ ,]+/).some((scope) => ['public_repo', 'repo'].includes(scope))) throw new Error('denied');
+    phase = 'TOKEN_RESPONSE';
+    // Only map known provider codes; never reflect error_description or unknown error text.
+    const tokenErrors = new Map([['incorrect_client_credentials', 'CREDENTIALS_INVALID'], ['redirect_uri_mismatch', 'CALLBACK_MISMATCH'], ['bad_verification_code', 'CODE_REJECTED'], ['unverified_user_email', 'EMAIL_UNVERIFIED']]);
+    if (token?.error) return error(400, true, tokenErrors.get(token.error) ?? phase);
+    if (!token || typeof token.access_token !== 'string' || !/^[A-Za-z0-9_]{1,512}$/.test(token.access_token) || typeof token.token_type !== 'string' || token.token_type.toLowerCase() !== 'bearer' || typeof token.scope !== 'string' || !token.scope.split(/[ ,]+/).some((scope) => ['public_repo', 'repo'].includes(scope))) throw new Error('denied');
     const headers = { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token.access_token}`, 'User-Agent': 'smtmtc-cms', 'X-GitHub-Api-Version': '2022-11-28' };
+    phase = 'ACCOUNT_CHECK';
     const user = await githubJSON(fetcher, 'https://api.github.com/user', { headers });
     if (user.login !== 'yannn-hash') throw new Error('denied');
+    phase = 'REPOSITORY_CHECK';
     const repo = await githubJSON(fetcher, 'https://api.github.com/repos/yannn-hash/blog', { headers });
     if (repo.full_name !== 'yannn-hash/blog' || repo.permissions?.push !== true) throw new Error('denied');
+    phase = 'POPUP_RESPONSE';
     return success(token.access_token, settings.origin);
-  } catch { return error(400, callback); }
+  } catch { return error(400, callback, phase); }
 }
 export default { fetch(request, env) { return handleRequest(request, env); } };
