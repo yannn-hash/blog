@@ -3,7 +3,11 @@
   "name": "smtmtc-blog",
   "compatibility_date": "2026-10-01",
   "main": "workers/cms-auth.mjs",
-  "vars": { "CMS_ORIGIN": "https://smtmtc-blog.smtmtc.workers.dev" },
+  "vars": {
+    "CMS_ORIGIN": "https://smtmtc-blog.smtmtc.workers.dev",
+    "CLOUDFLARE_ACCOUNT_ID": "6a5bdc67a89f78f752a8119c16c51b67",
+    "CLOUDFLARE_WORKER_TAG": "862fc676a1f1489ba153472a41501820"
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
