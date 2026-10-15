@@ -1,7 +1,7 @@
 ---
 tags:
   - 'latihan'
-draft: true
+draft: false
 example: true
 filename: 'cobaartikel'
 title: 'coba coba'
