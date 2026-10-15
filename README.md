@@ -1,6 +1,6 @@
 # Blog Riskiyanto · smtmtc
 
-Blog pribadi statis dengan Astro, antarmuka bahasa Indonesia, dan artikel Markdown. Domain tujuan: **https://smtmtc.com**. Situs belum diterbitkan dari pekerjaan lokal ini.
+Blog pribadi statis dengan Astro, antarmuka bahasa Indonesia, dan artikel Markdown. Hosting saat ini: **https://smtmtc-blog.smtmtc.workers.dev**. Domain tujuan: **https://smtmtc.com**.
 
 ## Jalankan di komputer
 
@@ -21,6 +21,8 @@ npm.cmd run preview
 ```
 
 `check` memeriksa Astro/TypeScript. `test` membangun situs lalu menguji aturan publikasi, pencarian, schema, dan keluaran HTML/RSS/sitemap. `build` menghasilkan `dist/`; `preview` menampilkan hasil build secara lokal. Tidak ada database atau token yang dibutuhkan.
+
+Untuk menulis di browser, jalankan `npm.cmd run dev` dan `npm.cmd run cms:local` di dua terminal, lalu buka `http://localhost:4321/admin/`. Proxy lokal menulis Markdown langsung tanpa GitHub. Lihat [panduan CMS](docs/CMS.md) untuk draf, gambar, setup OAuth produksi, dan langkah verifikasi login yang masih perlu dilakukan pemilik.
 
 ## Menulis artikel
 
@@ -61,12 +63,12 @@ Tiga artikel awal berlabel `example: true`; ganti dengan tulisan pribadi atau ha
 - `public/`: aset yang disalin tanpa pemrosesan.
 - `tests/`: pengujian perilaku dan hasil build.
 
-[Panduan belajar Astro](docs/BELAJAR-ASTRO.md) menjelaskan alur latihan dari halaman pertama sampai menulis artikel. [Panduan Cloudflare](docs/DEPLOY-CLOUDFLARE.md) menjelaskan deployment Workers Free dan tahap CMS berikutnya.
+[Panduan belajar Astro](docs/BELAJAR-ASTRO.md) menjelaskan alur latihan dari halaman pertama sampai menulis artikel. [Panduan Cloudflare](docs/DEPLOY-CLOUDFLARE.md) menjelaskan deployment Workers Free; [panduan CMS](docs/CMS.md) menjelaskan editor browser dan GitHub OAuth.
 
 ## Repository, hosting, dan editor browser
 
-Repositori yang diberikan: **https://github.com/yannn-hash/blog**. Folder ini belum otomatis terhubung atau didorong ke repositori tersebut; periksa isi/branch remote sebelum mengunggah. Jangan commit `.env`, token, `node_modules`, atau `dist`.
+Repositori konten: **https://github.com/yannn-hash/blog**, branch **main**. Periksa remote/branch dan perubahan lokal sebelum pull/push. Jangan commit `.env`, `.dev.vars`, token, `node_modules`, atau `dist`.
 
 `wrangler.jsonc` memakai `dist/` sebagai static assets dan halaman `404.html` untuk alamat tidak dikenal. Tidak ada konfigurasi custom domain atau perubahan DNS. Penerbitan awal dilakukan secara manual oleh pemilik blog. `npm.cmd run worker:dev` menjalankan simulasi Worker lokal; `npm.cmd run deploy` benar-benar mengunggah ke akun Cloudflare yang terautentikasi, jadi jalankan hanya saat siap menerbitkan.
 
-CMS berbasis Git direncanakan setelah repositori dan autentikasi siap. Belum ada halaman admin atau login yang terhubung. File Markdown akan tetap menjadi sumber artikel: editor menyimpan perubahan ke Git, kemudian build menghasilkan halaman baru. Login OAuth, hak akses repository, preview deployment, dan publish harus dihubungkan serta diuji sebelum dashboard disebut siap.
+Decap CMS tersedia di `/admin/` dengan bundle 3.17.1 yang dihosting sendiri. Broker OAuth GitHub berada di Worker `/api/cms/*`; pemilik perlu membuat OAuth App, memasang secrets, dan menguji login produksi. Hanya akun `yannn-hash` dengan izin push pada repo yang diterima. Menyimpan di CMS produksi membuat commit ke GitHub; jalankan `git pull --ff-only origin main`, check/test, lalu deploy manual untuk memperbarui situs. Tidak ada pembaruan live atau deployment otomatis. Login produksi dan browser QA belum diverifikasi.

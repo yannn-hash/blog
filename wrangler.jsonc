@@ -2,8 +2,12 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "smtmtc-blog",
   "compatibility_date": "2026-10-01",
+  "main": "workers/cms-auth.mjs",
+  "vars": { "CMS_ORIGIN": "https://smtmtc-blog.smtmtc.workers.dev" },
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/cms/*"],
     "not_found_handling": "404-page",
     "html_handling": "force-trailing-slash"
   }

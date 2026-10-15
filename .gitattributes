@@ -1,0 +1,6 @@
+public/admin/vendor/* -text
+public/admin/vendor/*.js -text -diff
+public/admin/vendor/*.wasm -text -diff
+public/admin/vendor/*.css -diff
+public/admin/vendor/LICENSE -text
+public/admin/vendor/*.LICENSE.txt -text

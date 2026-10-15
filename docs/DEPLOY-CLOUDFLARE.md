@@ -1,6 +1,6 @@
 # Menyiapkan deployment Cloudflare Workers
 
-Proyek ini menghasilkan situs statis. Cloudflare Workers menyajikan file `dist/`; tidak diperlukan adapter SSR, database, atau Worker buatan sendiri. Persiapan lokal tidak menerbitkan situs, mengubah DNS, atau mengaktifkan paket berbayar.
+Proyek ini menghasilkan situs statis. Cloudflare Workers menyajikan file `dist/` melalui binding `ASSETS`; module Worker hanya menangani broker OAuth `/api/cms/*` dan meneruskan permintaan lain ke aset. Tidak diperlukan adapter SSR atau database. Persiapan lokal tidak menerbitkan situs, mengubah DNS, atau mengaktifkan paket berbayar.
 
 ## Sebelum menghubungkan akun
 
@@ -24,7 +24,7 @@ git init
 git branch -M main
 git remote add origin https://github.com/yannn-hash/blog.git
 git status
-git add package.json package-lock.json astro.config.mjs tsconfig.json wrangler.jsonc .gitignore .env.example README.md src public scripts tests docs
+git add package.json package-lock.json astro.config.mjs tsconfig.json wrangler.jsonc .gitignore .gitattributes .env.example README.md src public scripts tests docs workers
 git diff --cached --stat
 git commit -m "Membuat blog Astro Riskiyanto"
 git push -u origin main
@@ -74,17 +74,19 @@ Tahap domain perlu pemeriksaan tersendiri: domain harus berada pada zona aktif C
 
 Periksa HTTPS, redirect URL, canonical, RSS, dan sitemap setelah domain aktif. Jangan menghapus record yang masih dipakai layanan lain.
 
-## 5. CMS berbasis Git
+## 5. CMS berbasis Git dan OAuth
 
-Dashboard menulis adalah tahap berikutnya. Belum ada login/admin aktif di blog ini.
+Decap CMS 3.17.1 kini tersedia di `/admin/`, dengan repositori `yannn-hash/blog` pada `main`. Broker Worker membutuhkan OAuth App milik pengguna; login produksi belum diverifikasi. Panduan lengkap, dua terminal lokal, scope, secrets dan pemeriksaan browser ada di [CMS.md](CMS.md).
 
-1. Pilih editor Git yang sesuai untuk file Markdown dan field schema yang ada.
-2. Hubungkan repositori nyata serta branch konten.
-3. Siapkan autentikasi sesuai dokumentasi resmi editor. Beberapa editor memerlukan OAuth App serta backend autentikasi; HTML statis tidak bisa menyimpan client secret dengan aman.
-4. Simpan secret hanya di penyedia autentikasi/secret manager layanan, bukan `public`, JavaScript browser, Git, atau frontmatter.
-5. Uji akun tanpa izin, akun penulis, simpan draf, preview, lalu publish. Pastikan perubahan disimpan sebagai commit dan deployment berhasil.
+1. Buat GitHub **OAuth App** secara manual dengan callback persis `https://smtmtc-blog.smtmtc.workers.dev/api/cms/callback` dan homepage `https://smtmtc-blog.smtmtc.workers.dev`.
+2. Atur `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, dan `CMS_SESSION_SECRET` (acak minimal 32 karakter) dengan `node scripts/run.mjs wrangler secret put NAMA_SECRET`. Masukkan nilainya hanya pada prompt Wrangler. Jangan simpan di public/JavaScript browser/Git/frontmatter.
+3. `CMS_ORIGIN` di konfigurasi sudah menunjuk origin workers.dev saat ini. Jalankan check/test lalu deployment manual hanya saat siap.
+4. Uji popup login, akun tanpa izin, akun yannn-hash, simpan draf, gambar, serta artikel terbit. Broker meminta scope `public_repo`, yang mencakup semua repo publik yang dapat diakses akun; pembatasan broker ke repo blog tidak mempersempit token GitHub.
+5. Sesudah CMS membuat commit di GitHub, jalankan `git pull --ff-only origin main`, check/test, lalu `npm.cmd run deploy`. CMS tidak otomatis memperbarui situs publik.
 
 Editor harus mempertahankan `title`, `description`, `pubDate` berbentuk string `YYYY-MM-DD`, `tags`, dan `draft`. `example` opsional. URL mengikuti nama file. Model artikel tetap sama tanpa migrasi database.
+
+Ketika pindah domain, perbarui origin pada `wrangler.jsonc` dan `src/cms/config.mjs`, callback OAuth App menjadi `https://smtmtc.com/api/cms/callback`, lalu build/redeploy dan uji login lagi. Browser QA serta OAuth produksi nyata masih perlu dilakukan pemilik; keduanya tidak tersedia pada lingkungan pengerjaan ini.
 
 Artikel terjadwal tidak otomatis terbit ketika jam berganti: Worker menyajikan build terakhir. Jalankan build setelah waktu publikasi atau tambahkan otomatisasi build terjadwal pada tahap berikutnya jika diperlukan.
 

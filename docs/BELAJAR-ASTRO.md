@@ -71,8 +71,10 @@ npm.cmd run preview
 
 Jika build gagal, baca nama file dan field pada pesan error. Periksa judul wajib, format tanggal dalam tanda kutip, tanggal kalender yang benar, dan tag huruf kecil. Perbaiki sumber, lalu ulangi build.
 
-## Berikutnya: menulis melalui browser
+## 8. Menulis melalui browser
 
-CMS berbasis Git akan mengedit file yang sama lewat browser. Git menyimpan riwayat, sedangkan Cloudflare membangun dan menerbitkan perubahan. Database artikel tetap tidak diperlukan. Tahap tersebut membutuhkan login nyata, hak akses ke repositori, dan pengujian preview/publish. Lihat [panduan deployment](DEPLOY-CLOUDFLARE.md) sebelum menghubungkan layanan.
+Decap CMS di `/admin/` mengedit file Markdown yang sama. Jalankan `npm.cmd run dev` di terminal pertama dan `npm.cmd run cms:local` di terminal kedua, lalu buka `http://localhost:4321/admin/`. Buat artikel dengan nama file aman, simpan sebagai draf, dan periksa file hasilnya di `src/content/blog`. Coba ubah judul/tanggal dan pastikan nama file tetap sama. Proxy lokal memakai filesystem tanpa commit Git otomatis.
+
+Di produksi editor membuat commit pada GitHub; pemilik harus menarik perubahan lalu build/deploy manual. Tidak ada database atau deployment otomatis. Setup OAuth App/secrets dan pengujian login nyata masih merupakan langkah manual pemilik. Ikuti [panduan CMS](CMS.md) dan [panduan deployment](DEPLOY-CLOUDFLARE.md).
 
 Referensi resmi: [struktur proyek](https://docs.astro.build/en/basics/project-structure/), [komponen](https://docs.astro.build/en/basics/astro-components/), dan [Content Collections](https://docs.astro.build/en/guides/content-collections/).
